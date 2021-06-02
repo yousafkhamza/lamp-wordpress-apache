@@ -16,7 +16,7 @@
         - never
         - lamp
 
-    - name: "Task 01.1-Apache Service Status"
+    - name: "Task 02-Apache Service Status"
       ignore_errors: true
       service:
         name: httpd
@@ -26,7 +26,7 @@
         - never
         - wordpress
 
-    - name: "Appache is not installed we are quit the playbook"
+    - name: "Task 03-Appache is not installed we are quit the playbook"
       when: httpd_status.changed == false
       fail:
         msg: "Paly book exiting due to Appache isn't installed"
@@ -34,13 +34,13 @@
         - never
         - wordpress
 
-    - name: "Task 02-Apache Installing PHP"
+    - name: "Task 04-Installing PHP"
       shell: amazon-linux-extras install php7.4 -y
       tags:
         - never
         - lamp
 
-    - name: "Task 03-Creating httpd Configuration"
+    - name: "Task 05-Creating httpd Configuration"
       template: 
         src: httpd.conf.tmpl
         dest: /etc/httpd/conf/httpd.conf
@@ -49,7 +49,7 @@
         - never
         - lamp
 
-    - name: "Task 04-Apache Creating virtualhost"
+    - name: "Task 06-Creating Domain virtualhost"
       template: 
         src: virtualhost.conf.tmpl
         dest: "/etc/httpd/conf.d/{{ domain }}.conf"
@@ -58,7 +58,7 @@
         - never
         - wordpress
 
-    - name: "Task 04.1-Creating www Directory"
+    - name: "Task 07-Creating HTML Directory"
       file:
         path: "/var/www/html"
         state: directory
@@ -66,7 +66,7 @@
         - never
         - lamp
 
-    - name: "Task 05-Appache Syntax Checking" 
+    - name: "Task 08-Appache Syntax Check" 
       ignore_errors: true
       shell: httpd -t
       register: apache_syn
@@ -75,7 +75,7 @@
         - lamp
         - wordpress
 
-    - name: "apache Syntax Status"
+    - name: "Task 09-Apache Syntax Status"
       when: apache_syn.rc != 0
       debug:
         msg: "Status => {{ apache_syn.stderr }}"
@@ -84,7 +84,7 @@
         - lamp
         - wordprss
 
-    - name: "apache is failed we are quit the playbook"
+    - name: "Apache is failed we are quit the playbook"
       when: apache_syn.rc != 0
       fail:
         msg: "Paly book exiting due to apache syntax check failure."
@@ -93,7 +93,7 @@
         - lamp
         - wordpress
 
-    - name: "Task 06-Creating virtual host document root"
+    - name: "Task 10-Creating Domain Document Root"
       file:
         path: "/var/www/html/{{ domain }}/"
         state: directory
@@ -104,7 +104,7 @@
         - never
         - wordpress
 
-    - name: "Task 07-Creating Test.php file"   
+    - name: "Task 11-Creating Index.html file for Apache"   
       copy:
         content: "<h1>Your Server is working fine</h1>"
         dest: "/var/www/html/index.html"
@@ -114,7 +114,7 @@
         - never
         - lamp
 
-    - name: "Task 08-Apache - Restart/Enable Service"
+    - name: "Task 12-For Wordpress installation (Restart Service)"
       when: apache_syn.rc == 0 and vhost_status.changed == true
       service:
         name: httpd
@@ -124,7 +124,7 @@
         - never
         - wordpress
 
-    - name: "Task 08- For Wordpress installation time Apache - Restart/Enable Service"
+    - name: "Task 13-Apache - Restart/Enable Service"
       when: apache_syn.rc == 0 or host_status.changed == true or httpd_installed.changed == true
       service:
         name: httpd
@@ -134,7 +134,7 @@
         - never
         - lamp
         
-    - name: "Task 09-Mariadb - package Installation"
+    - name: "Task 14-Mariadb - Installation"
       yum:
         name: 
           - mariadb-server
@@ -145,7 +145,7 @@
         - never
         - lamp
 
-    - name: "Task 10-MariaDB - restarting/enabling service"
+    - name: "Task 15-MariaDB - Restarting/Enabling service"
       when: maria_install.changed == true
       service:
         name: mariadb
@@ -155,7 +155,7 @@
         - never
         - lamp
 
-    - name: "Task 11-MariDB - update root password"
+    - name: "Task 16-MariDB - root password updating"
       ignore_errors: true
       mysql_user:
         login_user: "root"
@@ -167,7 +167,7 @@
         - never
         - lamp
 
-    - name: "Task 12-MariaDB - removing anonymous users"
+    - name: "Task 17-MariaDB - removing anonymous users"
       mysql_user:
         login_user: "root"
         login_password: "{{ mysql_root_pw }}"
@@ -177,7 +177,7 @@
         - never
         - lamp
 
-    - name: "Task 13-MariaDB - removing test database"
+    - name: "Task 18-MariaDB - removing test database"
       mysql_db:
         login_user: "root"
         login_password: "{{ mysql_root_pw }}"
@@ -187,7 +187,7 @@
         - never
         - lamp
 
-    - name: "Task 14-MariaDB - Creating database"
+    - name: "Task 19-MariaDB - Creating database"
       mysql_db:
         login_user: "root"
         login_password: "{{ mysql_root_pw }}"
@@ -197,7 +197,7 @@
         - never
         - wordpress
 
-    - name: "Task 15-MariaDB - creating user & password"
+    - name: "Task 20-MariaDB - creating user & password"
       mysql_user:
         login_user: "root"
         login_password: "{{ mysql_root_pw }}"
@@ -209,7 +209,7 @@
         - never
         - wordpress
         
-    - name: "Task 16-Wordpress - Downloading Tar File"
+    - name: "Task 21-Wordpress - Downloading Tar File"
       get_url:
         url: "{{ wordpress_url }}"
         dest: /tmp/wordpress.tar.gz
@@ -217,7 +217,7 @@
         - never
         - wordpress
             
-    - name: "Task 17-Wordpress - Extracting Wordpress.tar"
+    - name: "Task 22-Wordpress - Extracting Wordpress.tar"
       unarchive:
         src: /tmp/wordpress.tar.gz
         dest: /tmp/
@@ -226,7 +226,7 @@
         - never
         - wordpress
             
-    - name: "Task 18-Wordpress - Copying Contents"
+    - name: "Task 23-Wordpress - Copying Contents"
       copy:
         src: /tmp/wordpress/
         dest: "/var/www/html/{{ domain }}/"
@@ -238,7 +238,7 @@
         - wordpress
       notify: WordPress-Installed
 
-    - name: "Task 19-Wordpress - Creating wp-config.php"
+    - name: "Task 24-Wordpress - Creating wp-config.php for domain"
       template:
         src: wp-config.php.tmpl
         dest: "/var/www/html/{{ domain }}/wp-config.php"
@@ -248,7 +248,7 @@
         - never
         - wordpress
             
-    - name: "Task 20-Post-Installation Restart"
+    - name: "Task 25-Post-Installation Restart"
       when:  apache_syn.rc == 0 and host_status.changed == true
       service:
         name: "{{ item }}"
@@ -260,7 +260,7 @@
         - never
         - lamp
       
-    - name: "Task 21-Post-Installation Clean-Up"
+    - name: "Task 26-Post-Installation Clean-Up"
       file:
         path: "{{ item }}"
         state: absent
