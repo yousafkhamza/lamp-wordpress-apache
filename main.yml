@@ -1,0 +1,329 @@
+---
+- name: "Installing LAMP Server"
+  become: true
+  hosts: amazon
+  vars_files: 
+    - lamp.vars
+    - wp.vars
+  tasks: 
+    - name: "Task 01-Installing Apache Service"
+      yum:
+        name: 
+          - httpd
+        state: present
+      register: httpd_installed
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 01.1-Apache Service Status"
+      ignore_errors: true
+      service:
+        name: httpd
+        state: restarted
+      register: httpd_status
+      tags:
+        - never
+        - wordpress
+
+    - name: "Appache is not installed we are quit the playbook"
+      when: httpd_status.changed == false
+      fail:
+        msg: "Paly book exiting due to Appache isn't installed"
+      tags:
+        - never
+        - wordpress
+
+    - name: "Task 02-Apache Installing PHP"
+      shell: amazon-linux-extras install php7.4 -y
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 03-Creating httpd Configuration"
+      template: 
+        src: httpd.conf.tmpl
+        dest: /etc/httpd/conf/httpd.conf
+      register: host_status
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 04-Apache Creating virtualhost"
+      template: 
+        src: virtualhost.conf.tmpl
+        dest: "/etc/httpd/conf.d/{{ domain }}.conf"
+      register: vhost_status
+      tags:
+        - never
+        - wordpress
+
+    - name: "Task 04.1-Creating www Directory"
+      file:
+        path: "/var/www/html"
+        state: directory
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 05-Appache Syntax Checking" 
+      ignore_errors: true
+      shell: httpd -t
+      register: apache_syn
+      tags:
+        - never
+        - lamp
+        - wordpress
+
+    - name: "apache Syntax Status"
+      when: apache_syn.rc != 0
+      debug:
+        msg: "Status => {{ apache_syn.stderr }}"
+      tags:
+        - never
+        - lamp
+        - wordprss
+
+    - name: "apache is failed we are quit the playbook"
+      when: apache_syn.rc != 0
+      fail:
+        msg: "Paly book exiting due to apache syntax check failure."
+      tags:
+        - never
+        - lamp
+        - wordpress
+
+    - name: "Task 06-Creating virtual host document root"
+      file:
+        path: "/var/www/html/{{ domain }}/"
+        state: directory
+        mode: '0755'
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+      tags:
+        - never
+        - wordpress
+
+    - name: "Task 07-Creating Test.php file"   
+      copy:
+        content: "<h1>Your Server is working fine</h1>"
+        dest: "/var/www/html/index.html"
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 08-Apache - Restart/Enable Service"
+      when: apache_syn.rc == 0 and vhost_status.changed == true
+      service:
+        name: httpd
+        state: restarted
+        enabled: true
+      tags:
+        - never
+        - wordpress
+
+    - name: "Task 08- For Wordpress installation time Apache - Restart/Enable Service"
+      when: apache_syn.rc == 0 or host_status.changed == true or httpd_installed.changed == true
+      service:
+        name: httpd
+        state: restarted
+        enabled: true
+      tags:
+        - never
+        - lamp
+        
+    - name: "Task 09-Mariadb - package Installation"
+      yum:
+        name: 
+          - mariadb-server
+          - MySQL-python
+        state: present
+      register: maria_install
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 10-MariaDB - restarting/enabling service"
+      when: maria_install.changed == true
+      service:
+        name: mariadb
+        state: restarted
+        enabled: true
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 11-MariDB - update root password"
+      ignore_errors: true
+      mysql_user:
+        login_user: "root"
+        login_password: ""
+        user: "root"
+        password: "{{ mysql_root_pw }}"
+        host_all: true
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 12-MariaDB - removing anonymous users"
+      mysql_user:
+        login_user: "root"
+        login_password: "{{ mysql_root_pw }}"
+        user: ""
+        state: absent     
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 13-MariaDB - removing test database"
+      mysql_db:
+        login_user: "root"
+        login_password: "{{ mysql_root_pw }}"
+        name: "test"
+        state: absent
+      tags:
+        - never
+        - lamp
+
+    - name: "Task 14-MariaDB - Creating database"
+      mysql_db:
+        login_user: "root"
+        login_password: "{{ mysql_root_pw }}"
+        name: "{{ db_name }}"
+        state: present
+      tags:
+        - never
+        - wordpress
+
+    - name: "Task 15-MariaDB - creating user & password"
+      mysql_user:
+        login_user: "root"
+        login_password: "{{ mysql_root_pw }}"
+        user: "{{ db_user }}"
+        password: "{{ db_pw }}"
+        host: "%"
+        priv: '{{ db_name }}.*:ALL' 
+      tags:
+        - never
+        - wordpress
+        
+    - name: "Task 16-Wordpress - Downloading Tar File"
+      get_url:
+        url: "{{ wordpress_url }}"
+        dest: /tmp/wordpress.tar.gz
+      tags:
+        - never
+        - wordpress
+            
+    - name: "Task 17-Wordpress - Extracting Wordpress.tar"
+      unarchive:
+        src: /tmp/wordpress.tar.gz
+        dest: /tmp/
+        remote_src: true
+      tags:
+        - never
+        - wordpress
+            
+    - name: "Task 18-Wordpress - Copying Contents"
+      copy:
+        src: /tmp/wordpress/
+        dest: "/var/www/html/{{ domain }}/"
+        remote_src: true
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+      tags:
+        - never
+        - wordpress
+      notify: WordPress-Installed
+
+    - name: "Task 19-Wordpress - Creating wp-config.php"
+      template:
+        src: wp-config.php.tmpl
+        dest: "/var/www/html/{{ domain }}/wp-config.php"
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+      tags:
+        - never
+        - wordpress
+            
+    - name: "Task 20-Post-Installation Restart"
+      when:  apache_syn.rc == 0 and host_status.changed == true
+      service:
+        name: "{{ item }}"
+        state: restarted
+      with_items:
+        - httpd
+        - mariadb
+      tags:
+        - never
+        - lamp
+      
+    - name: "Task 21-Post-Installation Clean-Up"
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /tmp/wordpress
+        - /tmp/wordpress.tar.gz
+      tags:
+        - never
+        - wordpress
+      
+#-----------------------------------------------------------------------------------
+# Lets clean these packages and files
+#-----------------------------------------------------------------------------------
+    - name: "Task 01-Clean all the installed Packages and Files"
+      shell: yum remove php-* -y; yum-complete-transaction --cleanup-only;
+      tags:
+        - never
+        - remove
+
+    - name: "Task 02-Remove httpd and MariaDB-Server"
+      yum:
+        name: 
+          - httpd
+          - mariadb-server
+          - mariadb
+          - php
+        state: absent
+      tags:
+        - never
+        - remove
+      notify: Remove-Message
+
+    - name: "Task 03-Remove all the files from httpd"
+      file:
+        path: "/var/www/html"
+        state: absent
+      tags:
+        - never
+        - remove
+      notify: Remove-Message
+
+    - name: "Task 04-Remove all the files from httpd conf"
+      file:
+        path: "/etc/httpd/"
+        state: absent
+      tags:
+        - never
+        - remove
+      notify: Remove-Message
+
+    - name: "Task 05-Remove all the files from MySOL"
+      file:
+        path: "/var/lib/mysql"
+        state: absent
+      tags:
+        - never
+        - remove
+      notify: Remove-Message
+  
+  handlers:
+    - name: Remove-Message
+      debug:
+        msg: "HTTPD MYSQL PHP And WordPress are Wipped From Your Server"
+    - name: WordPress-Installed
+      debug:
+        msg: "WordPress Installation Successfully"
