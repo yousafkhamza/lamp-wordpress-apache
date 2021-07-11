@@ -65,9 +65,6 @@ ansible -i hosts all -f 1 -m ping
 ansible-playbook -i hosts main.yml
 ```
 
-## Sample Screenshot: 
-![alt text](https://i.ibb.co/LvZC0nB/sample.png)
-
 ### Optional Security Feature:
 
 Here we have used the "variables.vars" file to pass the variables as a plain text, to overcome this we can encrypt the files with a password. [Ansible_vault](https://docs.ansible.com/ansible/latest/user_guide/vault.html) encrypts variables and files so you can protect sensitive content such as passwords or keys rather than leaving it visible as plaintext in playbooks or roles.
